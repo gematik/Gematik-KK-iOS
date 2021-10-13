@@ -1,0 +1,40 @@
+name: GematikKK
+options:
+  bundleIdPrefix: de.gematik
+  createIntermediateGroups: true
+  developmentLanguage: en-GB
+  useBaseInternationalization: false
+  deploymentTarget:
+    macOS: 10.15
+    iOS: 14.0
+settings:
+  base:
+    # for DISABLE_DIAMOND_PROBLEM_DIAGNOSTIC see: https://developer.apple.com/forums/thread/128806
+    DISABLE_DIAMOND_PROBLEM_DIAGNOSTIC: 1
+    CURRENT_PROJECT_VERSION: -1
+    CODE_SIGN_IDENTITY: ""
+    SWIFT_VERSION: 5.0
+    ALWAYS_SEARCH_USER_PATHS: NO
+    FRAMEWORK_SEARCH_PATHS: "$(inherited)"
+  configs:
+    Release:
+      SWIFT_COMPILATION_MODE: wholemodule
+    Debug:
+      SWIFT_COMPILATION_MODE: incremental
+targets:
+  GematikKK:
+    type: application
+    platform: iOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: de.gematik.kk
+        TARGETED_DEVICE_FAMILY: 1
+    configFiles:
+      Debug: Sources/GematikKK/Resources/debug.xcconfig
+      Release: Sources/GematikKK/Resources/release.xcconfig
+    sources:
+      - Sources/GematikKK
+    dependencies:
+      - sdk: Combine.framework
+      - sdk: SwiftUI.framework
+buildImplicitDependencies: true

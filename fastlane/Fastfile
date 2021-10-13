@@ -1,0 +1,127 @@
+#
+# Copyright (c) 2021 gematik GmbH
+# 
+# Licensed under the EUPL, Version 1.2 or – as soon they will be approved by
+# the European Commission - subsequent versions of the EUPL (the Licence);
+# You may not use this work except in compliance with the Licence.
+# You may obtain a copy of the Licence at:
+# 
+#     https://joinup.ec.europa.eu/software/page/eupl
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the Licence is distributed on an "AS IS" basis,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the Licence for the specific language governing permissions and
+# limitations under the Licence.
+# 
+#
+
+xcversion(version: ENV["FL_XCODE_VERSION"] || "12.5")
+
+fastlane_version "2.187.0"
+
+lane :setup do |options|
+  sh("xcodegen", "generate", "--spec", "../project.yml")
+end
+
+lane :build_simulator_archive do |options|
+  gym(
+    skip_codesigning: true,
+    skip_package_ipa: true,
+    sdk: "iphonesimulator",
+    export_method: "development",
+    archive_path: "./distribution/eRPApp_simulator_#{build_version}.xcarchive",
+    xcargs: "GEMATIK_SOURCE_VERSION=\"#{git_version}\" GEMATIK_BUNDLE_VERSION=\"#{build_version}\" SWIFT_ACTIVE_COMPILATION_CONDITIONS=\"$(inherited) ENABLE_DEBUG_VIEW TEST_ENVIRONMENT\" SUPPORTED_PLATFORMS=iphonesimulator ARCHS=x86_64"
+  )
+end
+
+lane :build_test_version do |options|
+  build_archive
+
+  sign_adhoc
+end
+
+lane :sign_adhoc do |options|
+  match(type: "adhoc")
+
+  gym(
+    skip_build_archive: true,
+    export_method: "ad-hoc",
+    output_name: "GematikKK_#{build_version}_adhoc.ipa",
+    archive_path: "./distribution/GematikKK_#{build_version}.xcarchive",
+    output_directory: "./distribution",
+    include_bitcode: false,
+    export_options: {
+        uploadBitcode: false,
+        uploadSymbols: true,
+        compileBitcode: false
+    }
+  )
+end
+
+lane :sign_appstore do |options|
+  match(type: "appstore")
+
+  gym(
+    skip_build_archive: true,
+    export_method: "app-store",
+    output_name: "GematikKK_#{build_version}_store.ipa",
+    archive_path: "./distribution/GematikKK_#{build_version}.xcarchive",
+    output_directory: "./distribution"
+  )
+end
+
+lane :build_archive do |options|
+  clear_derived_data(derived_data_path: ENV['GYM_DERIVED_DATA_PATH'])
+
+  match(type: "appstore")
+
+  gym(
+    skip_build_archive: false,
+    skip_package_ipa: true,
+    export_method: "app-store",
+    archive_path: "./distribution/GematikKK_#{build_version}.xcarchive",
+    xcargs: "GEMATIK_SOURCE_VERSION=\"#{git_version}\" GEMATIK_BUNDLE_VERSION=\"#{build_version}\""
+  )
+end
+
+before_all do |lane, options|
+  load_keychain
+end
+
+after_all do |lane, options|
+  remove_keychain
+end
+
+error do |lane, exception, options|
+  remove_keychain
+end
+
+def load_keychain
+  remove_keychain
+
+  create_keychain(
+    name: "gematik",
+    password: "gematikpassword",
+    unlock: true,
+    timeout: 0
+  )
+end
+
+def remove_keychain
+  if File.exist? File.expand_path("~/Library/Keychains/gematik-db")
+    delete_keychain(name: "gematik") 
+  end
+end
+
+def git_version()
+  short_hash = last_git_commit[:abbreviated_commit_hash]
+  dirty = sh("git diff --quiet || echo '-dirty'").strip!
+
+  "#{short_hash}#{dirty}"
+end
+
+def build_version()
+  ENV['BUILD_NUMBER'] || 'LOCAL_BUILD'
+end
+
